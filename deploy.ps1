@@ -1,33 +1,52 @@
-# deploy.ps1 - First-time deployment of OnesaitPlatform via WSL2
+# deploy.ps1 - First-time deployment (Native Windows or WSL2)
 # Run from Windows PowerShell or Windows Terminal (right-click > Run with PowerShell)
 
 $ErrorActionPreference = "Stop"
+
+. "$PSScriptRoot\wsl-helpers.ps1"
+. "$PSScriptRoot\platform-helpers.ps1"
 
 Write-Host "========================================================" -ForegroundColor Blue
 Write-Host "  OnesaitPlatform - First-time Deploy                  " -ForegroundColor Blue
 Write-Host "========================================================" -ForegroundColor Blue
 Write-Host ""
 
-# Verify WSL is available
-if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: WSL not found. Install WSL2 first: https://aka.ms/wsl2" -ForegroundColor Red
+$deployMode = Resolve-DeployMode -ScriptRoot $PSScriptRoot -AllowPrompt
+if (-not $deployMode) {
+    Show-DeployModeError -ScriptRoot $PSScriptRoot
     Read-Host "Press Enter to exit"
     exit 1
 }
 
-$wslScriptDir = "~/personal-projects/onesait-platform-deploy"
+Write-Host "Deployment mode: $deployMode" -ForegroundColor Cyan
+Save-DeployMode -ScriptRoot $PSScriptRoot -Mode $deployMode
 
-Write-Host "Launching deploy.sh in WSL2..." -ForegroundColor Yellow
-Write-Host "(Answer the prompts in the terminal below)" -ForegroundColor Cyan
-Write-Host ""
+$exitCode = 0
+$serverName = 'localhost'
 
-# Run deploy.sh interactively in WSL (stdin/stdout pass through to this terminal)
-wsl bash -c "cd $wslScriptDir && chmod +x deploy.sh && ./deploy.sh"
+try {
+    if ($deployMode -eq 'wsl') {
+        $wslScriptDir = Get-WslScriptDir -WindowsScriptRoot $PSScriptRoot
+        Write-Host "Project path (WSL): $wslScriptDir" -ForegroundColor Cyan
+        Write-Host "Launching deploy.sh in WSL2..." -ForegroundColor Yellow
+        Write-Host "(Answer the prompts in the terminal below)" -ForegroundColor Cyan
+        Write-Host ""
+        $exitCode = Invoke-WslBashScript -WslScriptDir $wslScriptDir -ScriptName "deploy.sh"
+    } else {
+        Write-Host "Project path: $PSScriptRoot" -ForegroundColor Cyan
+        Write-Host "Launching native Windows deployment..." -ForegroundColor Yellow
+        Write-Host "(Answer the prompts in the terminal below)" -ForegroundColor Cyan
+        Write-Host ""
+        $serverName = Invoke-PlatformDeploy -BaseDir $PSScriptRoot
+    }
+} catch {
+    Write-Host ""
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    $exitCode = 1
+}
 
-if ($LASTEXITCODE -eq 0) {
-    # Get WSL2 IP after deployment completes
-    $wslIp = (wsl bash -c "hostname -I") -split '\s+' | Where-Object { $_ -ne '' } | Select-Object -First 1
-    $url = "https://$wslIp/controlpanel/"
+if ($exitCode -eq 0) {
+    $url = Get-PlatformUrl -DeployMode $deployMode -ServerName $serverName
 
     Write-Host ""
     Write-Host "========================================================" -ForegroundColor Green
@@ -42,7 +61,7 @@ if ($LASTEXITCODE -eq 0) {
     Start-Process $url
 } else {
     Write-Host ""
-    Write-Host "ERROR: deploy.sh exited with errors. Check the output above." -ForegroundColor Red
+    Write-Host "ERROR: Deployment finished with errors. Check the output above." -ForegroundColor Red
 }
 
 Read-Host "Press Enter to close"

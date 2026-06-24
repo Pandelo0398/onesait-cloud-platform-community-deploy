@@ -2,5 +2,10 @@
 op_data/data/
 # Certificados TLS generados localmente
 op_modules/nginx-proxy/tls/
+# Estado local del despliegue
+.profile
+.deploy-mode
+# Notebooks Zeppelin (runtime)
+op_modules/notebooks/notebook-storage/
 # Archivos temporales o logs
 *.log

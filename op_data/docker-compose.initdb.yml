@@ -8,7 +8,7 @@ services:
       - REALTIMEDBUSEAUTH=false
       - SERVER_NAME=${SERVER_NAME}
       - LOADELASTICDB=false
-      - LOADMONGODB=false
+      - LOADMONGODB=${LOADMONGODB:-false}
       - UPDATE_MODE_MULTITENANT=false
     networks:
       - op_data_datanetwork

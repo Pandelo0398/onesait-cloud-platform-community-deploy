@@ -112,7 +112,16 @@ if [ ! -f "$INIT_FLAG" ]; then
     docker rm -f configinitservice 2>/dev/null || true
     cd "$OP_DATA_DIR"
     docker compose -f docker-compose.initdb.yml down 2>/dev/null || true
+    echo -e "${YELLOW}Paso 1/2: Inicializando MariaDB (configdb)...${NC}"
     docker compose -f docker-compose.initdb.yml up --abort-on-container-exit
+    if [ $? -ne 0 ]; then
+        cd "$BASE_DIR"
+        echo -e "${RED}Error al inicializar MariaDB.${NC}"
+        exit 1
+    fi
+    echo -e "${YELLOW}Paso 2/2: Inicializando MongoDB (realtimedb)...${NC}"
+    docker rm -f configinitservice 2>/dev/null || true
+    LOADMONGODB=true docker compose -f docker-compose.initdb.yml up --abort-on-container-exit
     cd "$BASE_DIR"
 
     if [ $? -eq 0 ]; then

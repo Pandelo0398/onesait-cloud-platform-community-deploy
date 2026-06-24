@@ -1,29 +1,48 @@
-# start.ps1 - Start OnesaitPlatform after a WSL2 reboot or after stopping containers
-# Run from Windows PowerShell or Windows Terminal
+# start.ps1 - Start OnesaitPlatform (Native Windows or WSL2)
 
 $ErrorActionPreference = "Stop"
+
+. "$PSScriptRoot\wsl-helpers.ps1"
+. "$PSScriptRoot\platform-helpers.ps1"
 
 Write-Host "========================================================" -ForegroundColor Blue
 Write-Host "  OnesaitPlatform - Start                              " -ForegroundColor Blue
 Write-Host "========================================================" -ForegroundColor Blue
 Write-Host ""
 
-if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
-    Write-Host "ERROR: WSL not found." -ForegroundColor Red
+$deployMode = Get-SavedDeployMode -ScriptRoot $PSScriptRoot
+if (-not $deployMode) {
+    Show-DeployModeError -ScriptRoot $PSScriptRoot
     Read-Host "Press Enter to exit"
     exit 1
 }
 
-$wslScriptDir = "~/personal-projects/onesait-platform-deploy"
+Write-Host "Deployment mode: $deployMode" -ForegroundColor Cyan
 
-Write-Host "Starting OnesaitPlatform in WSL2..." -ForegroundColor Yellow
-Write-Host ""
+$exitCode = 0
+$serverName = 'localhost'
 
-wsl bash -c "cd $wslScriptDir && chmod +x start.sh && ./start.sh"
+try {
+    if ($deployMode -eq 'wsl') {
+        $wslScriptDir = Get-WslScriptDir -WindowsScriptRoot $PSScriptRoot
+        Write-Host "Project path (WSL): $wslScriptDir" -ForegroundColor Cyan
+        Write-Host "Starting OnesaitPlatform in WSL2..." -ForegroundColor Yellow
+        Write-Host ""
+        $exitCode = Invoke-WslBashScript -WslScriptDir $wslScriptDir -ScriptName "start.sh"
+    } else {
+        Write-Host "Project path: $PSScriptRoot" -ForegroundColor Cyan
+        Write-Host "Starting OnesaitPlatform (native Windows)..." -ForegroundColor Yellow
+        Write-Host ""
+        $serverName = Invoke-PlatformStart -BaseDir $PSScriptRoot
+    }
+} catch {
+    Write-Host ""
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    $exitCode = 1
+}
 
-if ($LASTEXITCODE -eq 0) {
-    $wslIp = (wsl bash -c "hostname -I") -split '\s+' | Where-Object { $_ -ne '' } | Select-Object -First 1
-    $url = "https://$wslIp/controlpanel/"
+if ($exitCode -eq 0) {
+    $url = Get-PlatformUrl -DeployMode $deployMode -ServerName $serverName
 
     Write-Host ""
     Write-Host "========================================================" -ForegroundColor Green
@@ -40,6 +59,6 @@ if ($LASTEXITCODE -eq 0) {
     }
 } else {
     Write-Host ""
-    Write-Host "ERROR: start.sh exited with errors. Check the output above." -ForegroundColor Red
+    Write-Host "ERROR: Start finished with errors. Check the output above." -ForegroundColor Red
     Read-Host "Press Enter to close"
 }
