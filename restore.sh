@@ -3,10 +3,33 @@ BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Iniciando restauración de semillas de base de datos..."
 
-# 1. Importar Dump de MariaDB si existe
+# 1a. Importar Dump del realm Keycloak si existe (crítico en instalaciones nuevas)
+# El realm onesaitplatform debe existir antes de que el Control Panel pueda autenticarse.
+if [ -f "$BASE_DIR/db_seed/keycloak.sql" ]; then
+    echo "Importando dump de Keycloak (realm onesaitplatform)..."
+    docker exec -i configdb mysql -u root -pchangeIt! keycloak < "$BASE_DIR/db_seed/keycloak.sql"
+    if [ $? -eq 0 ]; then
+        echo "Keycloak DB importada con éxito."
+        # Restart keycloak so it picks up the new realm from MariaDB
+        docker restart keycloak 2>/dev/null && echo "Keycloak reiniciado."
+    else
+        echo "Error al importar Keycloak DB."
+    fi
+else
+    echo "No se encontró db_seed/keycloak.sql. Saltando (realm debe pre-existir)..."
+fi
+
+# 1b. Importar Dump de master_config si existe (requerido por Keycloak SPI)
+if [ -f "$BASE_DIR/db_seed/master_config.sql" ]; then
+    echo "Importando dump de onesaitplatform_master_config..."
+    docker exec -i configdb mysql -u root -pchangeIt! onesaitplatform_master_config < "$BASE_DIR/db_seed/master_config.sql"
+    [ $? -eq 0 ] && echo "master_config importado con éxito." || echo "Error al importar master_config."
+fi
+
+# 1c. Importar Dump de MariaDB (configdb) si existe
 if [ -f "$BASE_DIR/db_seed/configdb.sql" ]; then
     echo "Importando dump de MariaDB (configdb)..."
-    docker exec -i configdb mysql -u root -pchangeIt! < "$BASE_DIR/db_seed/configdb.sql"
+    docker exec -i configdb mysql -u root -pchangeIt! onesaitplatform_config < "$BASE_DIR/db_seed/configdb.sql"
     if [ $? -eq 0 ]; then
         echo "configdb importado con éxito."
     else
@@ -36,6 +59,7 @@ INSERT INTO user (user_id, active, created_at, email, full_name, password, updat
 -- ROLE_DATASCIENTIST: can access Dataflow (DataflowController requires ROLE_ADMINISTRATOR or ROLE_DATASCIENTIST)
 ('anyi', 1, NOW(), 'anyi@onesaitplatform.com', 'Anyi', 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'ROLE_DATASCIENTIST'),
 ('fernando', 1, NOW(), 'fernando@onesaitplatform.com', 'Fernando', 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'ROLE_DATASCIENTIST'),
+('jairodavis', 1, NOW(), 'jairodavis@onesaitplatform.com', 'Jairo Davis', 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'ROLE_DATASCIENTIST'),
 -- ROLE_DEVELOPER: standard developer access
 ('wesfalia', 1, NOW(), 'wesfalia@onesaitplatform.com', 'Wesfalia', 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'ROLE_DEVELOPER'),
 ('kevin', 1, NOW(), 'kevin@onesaitplatform.com', 'Kevin', 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'ROLE_DEVELOPER'),
@@ -52,6 +76,7 @@ docker exec -i configdb mysql -u root -pchangeIt! onesaitplatform_master_config 
 INSERT INTO master_user (user_id, active, created_at, email, failed_attemps, full_name, last_login, last_pswd_update, password, updated_at, tenant_id) VALUES
 ('anyi', 1, NOW(), 'anyi@onesaitplatform.com', 0, 'Anyi', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
 ('fernando', 1, NOW(), 'fernando@onesaitplatform.com', 0, 'Fernando', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
+('jairodavis', 1, NOW(), 'jairodavis@onesaitplatform.com', 0, 'Jairo Davis', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
 ('wesfalia', 1, NOW(), 'wesfalia@onesaitplatform.com', 0, 'Wesfalia', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
 ('kevin', 1, NOW(), 'kevin@onesaitplatform.com', 0, 'Kevin', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
 ('pamela', 1, NOW(), 'pamela@onesaitplatform.com', 0, 'Pamela', NOW(), NOW(), 'IKqlocGvkAxAJzcy6acRLkNB9ZJUwmXAiz8TVynJryc=', NOW(), 'MASTER-Tenant-1'),
