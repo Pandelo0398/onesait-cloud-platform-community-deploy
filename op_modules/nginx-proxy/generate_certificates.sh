@@ -2,7 +2,7 @@ echo "[Creating self signed certificates - Step 1]${green}######################
 
 # Set IP and COMMONNAME
 export IP="172.22.11.203"
-export COMMONNAME="localhost"
+export COMMONNAME="172.29.48.13"
 # Comment SO not used
 SEP="//" # WINDOWS
 #SEP="" # OTHERS
