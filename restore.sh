@@ -5,13 +5,16 @@ echo "Iniciando restauración de semillas de base de datos..."
 
 # 1a. Importar Dump del realm Keycloak si existe (crítico en instalaciones nuevas)
 # El realm onesaitplatform debe existir antes de que el Control Panel pueda autenticarse.
+# IMPORTANTE: restore.sh corre antes de que Keycloak arranque, así que la BD 'keycloak'
+# puede no existir todavía — la creamos explícitamente antes de importar.
 if [ -f "$BASE_DIR/db_seed/keycloak.sql" ]; then
+    echo "Creando base de datos keycloak si no existe..."
+    docker exec configdb mysql -u root -pchangeIt! \
+        -e "CREATE DATABASE IF NOT EXISTS keycloak CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
     echo "Importando dump de Keycloak (realm onesaitplatform)..."
     docker exec -i configdb mysql -u root -pchangeIt! keycloak < "$BASE_DIR/db_seed/keycloak.sql"
     if [ $? -eq 0 ]; then
-        echo "Keycloak DB importada con éxito."
-        # Restart keycloak so it picks up the new realm from MariaDB
-        docker restart keycloak 2>/dev/null && echo "Keycloak reiniciado."
+        echo "Keycloak DB importada con éxito. Keycloak arrancará con el realm pre-configurado."
     else
         echo "Error al importar Keycloak DB."
     fi
